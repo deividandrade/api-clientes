@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="https://thymeleaf.org"
+	xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+
+
+<title>Olá, mundo!</title>
+</head>
+
+<body>
+
+	<table>
+        <thead>
+            
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Sigla</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr th:each="estado : ${listarEstados}">
+                <td th:text="${estado.id}"></td>
+                <td th:text="${estado.nome}"></td>
+                <td th:text="${estado.sigla}"></td>
+                <td>
+                    <a th:href="@{/editarEstado/{id}(id=${estado.id})}">Editar</a>
+                    <a th:href="@{/removerEstado/{id}(id=${estado.id})}">Remover</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+
+</html>
