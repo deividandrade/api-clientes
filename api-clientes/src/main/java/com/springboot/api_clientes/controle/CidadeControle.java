@@ -19,7 +19,7 @@ public class CidadeControle {
 
 	@Autowired
 	private CidadeRepositorio cidadeRepositorio;
-	
+
 	@Autowired
 	private EstadoRepositorio estadoRepositorio;
 
@@ -30,31 +30,30 @@ public class CidadeControle {
 		mv.addObject("listaEstados", estadoRepositorio.findAll());
 		return mv;
 	}
-	
+
 	@GetMapping("/listarCidade")
 	public ModelAndView listar() {
 		ModelAndView mv = new ModelAndView("administrativo/cidades/lista");
 		mv.addObject("listarCidades", cidadeRepositorio.findAll());
 		return mv;
 	}
-	
+
 	@GetMapping("/editarCidade/{id}")
 	public ModelAndView editar(@PathVariable("id") Long id) {
 		Optional<Cidade> cidade = cidadeRepositorio.findById(id);
-		
+
 		return cadastrar(cidade.get());
-		
+
 	}
-	
+
 	@GetMapping("/removerCidade/{id}")
 	public ModelAndView remover(@PathVariable("id") Long id) {
 		Optional<Cidade> cidade = cidadeRepositorio.findById(id);
 		cidadeRepositorio.delete(cidade.get());
-		
+
 		return listar();
-		
+
 	}
-	
 
 	@PostMapping("/salvarCidade")
 	public ModelAndView salvar(Cidade cidade, BindingResult result) {

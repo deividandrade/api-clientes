@@ -18,7 +18,7 @@ public class Cidade implements Serializable {
 	private Long id;
 	private String nome;
 	private String cep;
-	
+
 	@ManyToOne
 	private Estado estado;
 
@@ -57,6 +57,5 @@ public class Cidade implements Serializable {
 	public static long getSerialversionuid() {
 		return serialVersionUID;
 	}
-
 
 }
