@@ -7,12 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.springboot.api_clientes.modelos.Entrada;
-import com.springboot.api_clientes.modelos.itemEntrada;
 import com.springboot.api_clientes.modelos.Produto;
+import com.springboot.api_clientes.modelos.itemEntrada;
 import com.springboot.api_clientes.repositorios.EntradaRepositorio;
 import com.springboot.api_clientes.repositorios.FornecedorRepositorio;
 import com.springboot.api_clientes.repositorios.FuncionarioRepositorio;
@@ -22,130 +23,169 @@ import com.springboot.api_clientes.repositorios.itemEntradaRepositorio;
 @Controller
 public class EntradaControle {
 
-	@Autowired
-	private EntradaRepositorio entradaRepositorio;
+    @Autowired
+    private EntradaRepositorio entradaRepositorio;
 
-	@Autowired
-	private itemEntradaRepositorio itemEntradaRepositorio;
+    @Autowired
+    private itemEntradaRepositorio itemEntradaRepositorio;
 
-	@Autowired
-	private ProdutoRepositorio produtoRepositorio;
+    @Autowired
+    private ProdutoRepositorio produtoRepositorio;
 
-	@Autowired
-	private FuncionarioRepositorio funcionarioRepositorio;
+    @Autowired
+    private FuncionarioRepositorio funcionarioRepositorio;
 
-	@Autowired
-	private FornecedorRepositorio fornecedorRepositorio;
+    @Autowired
+    private FornecedorRepositorio fornecedorRepositorio;
 
-	// lista temporária de itens
-	private List<itemEntrada> listaItemEntrada = new ArrayList<>();
+    // lista temporária de itens para montagem da entrada antes de salvar
+    private List<itemEntrada> listaItemEntrada = new ArrayList<>();
 
-	// =============================
-	// ABRIR TELA DE CADASTRO
-	// =============================
-	@GetMapping("/cadastroEntrada")
-	public ModelAndView cadastrar(Entrada entrada, itemEntrada itemEntrada) {
+    // =============================
+    // ABRIR TELA DE CADASTRO
+    // =============================
+    @GetMapping("/cadastroEntrada")
+    public ModelAndView cadastrar(Entrada entrada, itemEntrada itemEntrada) {
 
-		ModelAndView mv = new ModelAndView("administrativo/entradas/cadastro");
+        ModelAndView mv = new ModelAndView("administrativo/entradas/cadastro");
 
-		if (entrada == null) {
-			entrada = new Entrada();
-		}
+        if (entrada == null) {
+            entrada = new Entrada();
+        }
 
-		if (itemEntrada == null) {
-			itemEntrada = new itemEntrada();
-		}
+        if (itemEntrada == null) {
+            itemEntrada = new itemEntrada();
+        }
 
-		mv.addObject("entrada", entrada);
-		mv.addObject("itemEntrada", itemEntrada);
-		mv.addObject("listaItemEntrada", listaItemEntrada);
+        mv.addObject("entrada", entrada);
+        mv.addObject("itemEntrada", itemEntrada);
+        mv.addObject("listaItemEntrada", listaItemEntrada);
 
-		mv.addObject("listaFuncionarios", funcionarioRepositorio.findAll());
-		mv.addObject("listaFornecedores", fornecedorRepositorio.findAll());
-		mv.addObject("listaProdutos", produtoRepositorio.findAll());
+        mv.addObject("listaFuncionarios", funcionarioRepositorio.findAll());
+        mv.addObject("listaFornecedores", fornecedorRepositorio.findAll());
+        mv.addObject("listaProdutos", produtoRepositorio.findAll());
 
-		return mv;
-	}
+        return mv;
+    }
 
-	// =============================
-	// ADICIONAR ITEM
-	// =============================
-	@PostMapping("/adicionarItem")
-	public ModelAndView adicionarItem(Entrada entrada, itemEntrada itemEntrada) {
+    // =============================
+    // ADICIONAR ITEM NA LISTA TEMPORÁRIA
+    // =============================
+    @PostMapping("/adicionarItem")
+    public ModelAndView adicionarItem(Entrada entrada, itemEntrada itemEntrada) {
 
-		if (itemEntrada.getProduto() != null && itemEntrada.getQuantidade() != null
-				&& itemEntrada.getValorCusto() != null) {
+        if (itemEntrada.getProduto() != null &&
+            itemEntrada.getQuantidade() != null &&
+            itemEntrada.getValorCusto() != null) {
 
-			Produto produto = produtoRepositorio.findById(itemEntrada.getProduto().getId()).orElse(null);
+            Produto produto = produtoRepositorio
+                    .findById(itemEntrada.getProduto().getId())
+                    .orElse(null);
 
-			itemEntrada.setProduto(produto);
+            itemEntrada.setProduto(produto);
 
-			listaItemEntrada.add(itemEntrada);
-		}
+            listaItemEntrada.add(itemEntrada);
+        }
 
-		calcularTotais(entrada);
+        calcularTotais(entrada);
 
-		return cadastrar(entrada, new itemEntrada());
-	}
+        return cadastrar(entrada, new itemEntrada());
+    }
 
-	// =============================
-	// SALVAR ENTRADA
-	// =============================
-	@PostMapping("/salvarEntrada")
-	public ModelAndView salvarEntrada(Entrada entrada, BindingResult result) {
+    // =============================
+    // SALVAR ENTRADA E ITENS
+    // =============================
+    @PostMapping("/salvarEntrada")
+    public ModelAndView salvarEntrada(Entrada entrada, BindingResult result) {
 
-		if (result.hasErrors()) {
-			return cadastrar(entrada, new itemEntrada());
-		}
+        if (result.hasErrors()) {
+            return cadastrar(entrada, new itemEntrada());
+        }
 
-		calcularTotais(entrada);
+        calcularTotais(entrada);
 
-		Entrada entradaSalva = entradaRepositorio.saveAndFlush(entrada);
+        Entrada entradaSalva = entradaRepositorio.saveAndFlush(entrada);
 
-		for (itemEntrada item : listaItemEntrada) {
+        for (itemEntrada item : listaItemEntrada) {
+            item.setEntrada(entradaSalva);
+            itemEntradaRepositorio.save(item);
+        }
 
-			item.setEntrada(entradaSalva);
+        listaItemEntrada.clear();
 
-			itemEntradaRepositorio.save(item);
-		}
+        return cadastrar(new Entrada(), new itemEntrada());
+    }
 
-		listaItemEntrada.clear();
+    // =============================
+    // CALCULAR TOTAIS DA ENTRADA
+    // =============================
+    private void calcularTotais(Entrada entrada) {
 
-		return cadastrar(new Entrada(), new itemEntrada());
-	}
+        Double quantidadeTotal = 0.0;
+        Double valorTotal = 0.0;
 
-	// =============================
-	// CALCULAR TOTAIS
-	// =============================
-	private void calcularTotais(Entrada entrada) {
+        for (itemEntrada item : listaItemEntrada) {
+            if (item.getQuantidade() != null && item.getValorCusto() != null) {
+                quantidadeTotal += item.getQuantidade();
+                valorTotal += item.getQuantidade() * item.getValorCusto();
+            }
+        }
 
-		Double quantidadeTotal = 0.0;
-		Double valorTotal = 0.0;
+        entrada.setQuantidadeTotal(quantidadeTotal);
+        entrada.setValorTotal(valorTotal);
+    }
 
-		for (itemEntrada item : listaItemEntrada) {
+    // =============================
+    // LISTAR TODAS AS ENTRADAS
+    // =============================
+    @GetMapping("/listarEntrada")
+    public ModelAndView listar() {
 
-			if (item.getQuantidade() != null && item.getValorCusto() != null) {
+        ModelAndView mv = new ModelAndView("administrativo/entradas/lista");
+        mv.addObject("listarEntradas", entradaRepositorio.findAll());
 
-				quantidadeTotal += item.getQuantidade();
-				valorTotal += item.getQuantidade() * item.getValorCusto();
-			}
-		}
+        return mv;
+    }
 
-		entrada.setQuantidadeTotal(quantidadeTotal);
-		entrada.setValorTotal(valorTotal);
-	}
+    // =============================
+    // ABRIR TELA DE EDIÇÃO DE ENTRADA
+    // =============================
+    @GetMapping("/editarEntrada/{id}")
+    public ModelAndView editarEntrada(@PathVariable("id") Long id) {
 
-	// =============================
-	// LISTAR ENTRADAS
-	// =============================
-	@GetMapping("/listarEntrada")
-	public ModelAndView listar() {
+        Entrada entrada = entradaRepositorio.findById(id).orElse(null);
 
-		ModelAndView mv = new ModelAndView("administrativo/entradas/lista");
+        ModelAndView mv = new ModelAndView("administrativo/entradas/cadastro");
 
-		mv.addObject("listarEntradas", entradaRepositorio.findAll());
+        mv.addObject("entrada", entrada);
+        mv.addObject("itemEntrada", new itemEntrada());
 
-		return mv;
-	}
+        mv.addObject("listaFuncionarios", funcionarioRepositorio.findAll());
+        mv.addObject("listaFornecedores", fornecedorRepositorio.findAll());
+        mv.addObject("listaProdutos", produtoRepositorio.findAll());
 
+        return mv;
+    }
+
+    // =============================
+    // REMOVER ENTRADA E ITENS ASSOCIADOS
+    // =============================
+    @GetMapping("/removerEntrada/{id}")
+    public ModelAndView removerEntrada(@PathVariable("id") Long id) {
+
+        Entrada entrada = entradaRepositorio.findById(id).orElse(null);
+
+        if (entrada != null) {
+
+            List<itemEntrada> itens = itemEntradaRepositorio.findByEntrada(entrada);
+
+            // Exclui todos os itens relacionados primeiro para evitar erro de FK
+            itemEntradaRepositorio.deleteAll(itens);
+
+            // Depois exclui a entrada
+            entradaRepositorio.delete(entrada);
+        }
+
+        return listar();
+    }
 }
