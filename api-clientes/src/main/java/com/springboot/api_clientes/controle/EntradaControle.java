@@ -12,6 +12,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 import com.springboot.api_clientes.modelos.Entrada;
 import com.springboot.api_clientes.modelos.itemEntrada;
+import com.springboot.api_clientes.modelos.Produto;
 import com.springboot.api_clientes.repositorios.EntradaRepositorio;
 import com.springboot.api_clientes.repositorios.FornecedorRepositorio;
 import com.springboot.api_clientes.repositorios.FuncionarioRepositorio;
@@ -21,77 +22,130 @@ import com.springboot.api_clientes.repositorios.itemEntradaRepositorio;
 @Controller
 public class EntradaControle {
 
-    @Autowired
-    private EntradaRepositorio entradaRepositorio;
+	@Autowired
+	private EntradaRepositorio entradaRepositorio;
 
-    @Autowired
-    private itemEntradaRepositorio itemEntradaRepositorio;
+	@Autowired
+	private itemEntradaRepositorio itemEntradaRepositorio;
 
-    @Autowired
-    private ProdutoRepositorio produtoRepositorio;
+	@Autowired
+	private ProdutoRepositorio produtoRepositorio;
 
-    @Autowired
-    private FuncionarioRepositorio funcionarioRepositorio;
+	@Autowired
+	private FuncionarioRepositorio funcionarioRepositorio;
 
-    @Autowired
-    private FornecedorRepositorio fornecedorRepositorio;
+	@Autowired
+	private FornecedorRepositorio fornecedorRepositorio;
 
-    // Lista temporária de itens para a entrada
-    private List<itemEntrada> listaItemEntrada = new ArrayList<>();
+	// lista temporária de itens
+	private List<itemEntrada> listaItemEntrada = new ArrayList<>();
 
+	// =============================
+	// ABRIR TELA DE CADASTRO
+	// =============================
+	@GetMapping("/cadastroEntrada")
+	public ModelAndView cadastrar(Entrada entrada, itemEntrada itemEntrada) {
 
-    // Página de cadastro
-    @GetMapping("/cadastroEntrada")
-    public ModelAndView cadastrar(Entrada entrada, itemEntrada itemEntrada) {
-        ModelAndView mv = new ModelAndView("administrativo/entradas/cadastro");
+		ModelAndView mv = new ModelAndView("administrativo/entradas/cadastro");
 
-        mv.addObject("entrada", entrada == null ? new Entrada() : entrada);
-        mv.addObject("itemEntrada", itemEntrada == null ? new itemEntrada() : itemEntrada);
-        mv.addObject("listaItemEntrada", this.listaItemEntrada);
-        mv.addObject("listaFuncionarios", funcionarioRepositorio.findAll());
-        mv.addObject("listaFornecedores", fornecedorRepositorio.findAll());
-        mv.addObject("listaProdutos", produtoRepositorio.findAll());
+		if (entrada == null) {
+			entrada = new Entrada();
+		}
 
-        return mv;
-    }
+		if (itemEntrada == null) {
+			itemEntrada = new itemEntrada();
+		}
 
-    // Adicionar item à lista
-    @PostMapping("/adicionarItem")
-    public ModelAndView adicionarItem(Entrada entrada, itemEntrada itemEntrada) {
-        // Adiciona o item à lista temporária
-        if (itemEntrada != null) {
-            listaItemEntrada.add(itemEntrada);
-        }
-        return cadastrar(entrada, new itemEntrada());
-    }
+		mv.addObject("entrada", entrada);
+		mv.addObject("itemEntrada", itemEntrada);
+		mv.addObject("listaItemEntrada", listaItemEntrada);
 
-    // Salvar a entrada com todos os itens
-    @PostMapping("/salvarEntrada")
-    public ModelAndView salvarEntrada(Entrada entrada, BindingResult result) {
-        if (result.hasErrors()) {
-            return cadastrar(entrada, new itemEntrada());
-        }
+		mv.addObject("listaFuncionarios", funcionarioRepositorio.findAll());
+		mv.addObject("listaFornecedores", fornecedorRepositorio.findAll());
+		mv.addObject("listaProdutos", produtoRepositorio.findAll());
 
-        // Salva a entrada
-        Entrada entradaSalva = entradaRepositorio.saveAndFlush(entrada);
+		return mv;
+	}
 
-        // Salva todos os itens vinculando à entrada
-        for (itemEntrada item : listaItemEntrada) {
-            item.setEntrada(entradaSalva);
-            itemEntradaRepositorio.save(item);
-        }
+	// =============================
+	// ADICIONAR ITEM
+	// =============================
+	@PostMapping("/adicionarItem")
+	public ModelAndView adicionarItem(Entrada entrada, itemEntrada itemEntrada) {
 
-        // Limpa a lista para o próximo cadastro
-        listaItemEntrada.clear();
+		if (itemEntrada.getProduto() != null && itemEntrada.getQuantidade() != null
+				&& itemEntrada.getValorCusto() != null) {
 
-        return cadastrar(new Entrada(), new itemEntrada());
-    }
+			Produto produto = produtoRepositorio.findById(itemEntrada.getProduto().getId()).orElse(null);
 
-    // Lista todas as entradas
-    @GetMapping("/listarEntrada")
-    public ModelAndView listar() {
-        ModelAndView mv = new ModelAndView("administrativo/entradas/lista");
-        mv.addObject("listarEntradas", entradaRepositorio.findAll());
-        return mv;
-    }
+			itemEntrada.setProduto(produto);
+
+			listaItemEntrada.add(itemEntrada);
+		}
+
+		calcularTotais(entrada);
+
+		return cadastrar(entrada, new itemEntrada());
+	}
+
+	// =============================
+	// SALVAR ENTRADA
+	// =============================
+	@PostMapping("/salvarEntrada")
+	public ModelAndView salvarEntrada(Entrada entrada, BindingResult result) {
+
+		if (result.hasErrors()) {
+			return cadastrar(entrada, new itemEntrada());
+		}
+
+		calcularTotais(entrada);
+
+		Entrada entradaSalva = entradaRepositorio.saveAndFlush(entrada);
+
+		for (itemEntrada item : listaItemEntrada) {
+
+			item.setEntrada(entradaSalva);
+
+			itemEntradaRepositorio.save(item);
+		}
+
+		listaItemEntrada.clear();
+
+		return cadastrar(new Entrada(), new itemEntrada());
+	}
+
+	// =============================
+	// CALCULAR TOTAIS
+	// =============================
+	private void calcularTotais(Entrada entrada) {
+
+		Double quantidadeTotal = 0.0;
+		Double valorTotal = 0.0;
+
+		for (itemEntrada item : listaItemEntrada) {
+
+			if (item.getQuantidade() != null && item.getValorCusto() != null) {
+
+				quantidadeTotal += item.getQuantidade();
+				valorTotal += item.getQuantidade() * item.getValorCusto();
+			}
+		}
+
+		entrada.setQuantidadeTotal(quantidadeTotal);
+		entrada.setValorTotal(valorTotal);
+	}
+
+	// =============================
+	// LISTAR ENTRADAS
+	// =============================
+	@GetMapping("/listarEntrada")
+	public ModelAndView listar() {
+
+		ModelAndView mv = new ModelAndView("administrativo/entradas/lista");
+
+		mv.addObject("listarEntradas", entradaRepositorio.findAll());
+
+		return mv;
+	}
+
 }
