@@ -76,7 +76,5 @@ public class itemEntrada implements Serializable {
 	public void setValorCusto(Double valorCusto) {
 		this.valorCusto = valorCusto;
 	}
-	
-	
 
 }
